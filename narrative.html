@@ -111,6 +111,7 @@ body{font-family:var(--hv-font-body);background:var(--hv-bg-base);color:var(--hv
 }
 @media(max-width:480px){.heatmap .pct-cell{padding:4px 6px!important;font-size:11px}}
 </style>
+<script src="data/narrative/narrative_data.js"></script>
 </head>
 <body>
 <div class="dc">
@@ -217,7 +218,12 @@ function generateSectorData(){
   return result;
 }
 
-var sectorData=generateSectorData();
+var sectorData=(function(){
+  if(typeof SECTOR_DATA!=='undefined'&&Object.keys(SECTOR_DATA).length>0){
+    console.log('Loading real sector data');return SECTOR_DATA;
+  }
+  console.log('No real data, using sample');return generateSectorData();
+})();
 
 function calcReturn(arr,days){
   if(!arr||arr.length<days)return 0;
@@ -305,17 +311,18 @@ function rebuildSectorChart(){
 
 function rebuildTopBottom(){
   if(chartTB){chartTB.destroy();chartTB=null;}
-  // Generate individual token returns
   var allTokens=[];
-  SECTORS.forEach(function(sec){
-    if(sec.name==='BTC')return;
-    var d=sectorData[sec.name];
-    var secReturn=calcReturn(d,30);
-    sec.tokens.forEach(function(tok){
-      var spread=(Math.random()-0.5)*20;
-      allTokens.push({token:tok,sector:sec.name,ret:Math.round((secReturn+spread)*10)/10,color:sec.color});
+  if(typeof TOKEN_RETURNS!=='undefined'&&TOKEN_RETURNS.length>0){
+    allTokens=TOKEN_RETURNS.map(function(t){return{token:t.token,sector:t.sector,ret:t.return_30d};});
+  }else{
+    SECTORS.forEach(function(sec){
+      if(sec.name==='BTC')return;
+      var d=sectorData[sec.name];var secReturn=calcReturn(d,30);
+      sec.tokens.forEach(function(tok){
+        allTokens.push({token:tok,sector:sec.name,ret:Math.round((secReturn+(Math.random()-0.5)*20)*10)/10});
+      });
     });
-  });
+  }
   allTokens.sort(function(a,b){return b.ret-a.ret;});
   var top10=allTokens.slice(0,10);
   var bot10=allTokens.slice(-10).reverse();
