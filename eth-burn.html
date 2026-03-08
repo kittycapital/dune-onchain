@@ -429,10 +429,19 @@ document.querySelectorAll('.period-btn').forEach(function(btn){
 renderBurnersTable();
 filterData(180);
 
-function sendHeight(){var h=document.documentElement.scrollHeight;window.parent.postMessage({type:'herdvibe-height',height:h},'*');}
-window.addEventListener('load',sendHeight);
-window.addEventListener('resize',sendHeight);
-new MutationObserver(sendHeight).observe(document.body,{childList:true,subtree:true});
+var _lastH=0,_timer=null;
+function sendHeight(){
+  if(_timer)return;
+  _timer=setTimeout(function(){
+    _timer=null;
+    var h=document.documentElement.scrollHeight;
+    if(Math.abs(h-_lastH)>5){
+      _lastH=h;
+      window.parent.postMessage({type:'herdvibe-height',height:h},'*');
+    }
+  },500);
+}
+window.addEventListener('load',function(){setTimeout(sendHeight,1000);});
 </script>
 </body>
 </html>
