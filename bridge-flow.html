@@ -116,6 +116,7 @@ body{font-family:var(--hv-font-body);background:var(--hv-bg-base);color:var(--hv
   .kpi-value{font-size:16px}.kpi-label{font-size:9px}
 }
 </style>
+<script src="data/bridge-flow/bridge_flow_data.js"></script>
 </head>
 <body>
 <div class="dc">
@@ -260,7 +261,26 @@ function generateSampleData(){
   return daily;
 }
 
-var allData=generateSampleData();
+var allData=(function(){
+  if(typeof BRIDGE_DAILY_DATA!=='undefined'&&BRIDGE_DAILY_DATA.length>0){
+    console.log('Loading real bridge data:',BRIDGE_DAILY_DATA.length,'rows');
+    // Extract actual chains from data
+    var chainSet={};
+    BRIDGE_DAILY_DATA.forEach(function(d){
+      Object.keys(d.chains||{}).forEach(function(c){chainSet[c]=true;});
+    });
+    var realChains=Object.keys(chainSet);
+    if(realChains.length>0){
+      CHAINS.length=0;
+      realChains.forEach(function(c){CHAINS.push(c);});
+      CHAIN_COLORS.length=0;
+      var palette=['#2d68e4','#ff0420','#7b3fe4','#14f195','#0052ff','#f3ba2f','#8b8dfc','#e84142','#ffeeda','#61dfff'];
+      realChains.forEach(function(c,i){CHAIN_COLORS.push(palette[i%palette.length]);});
+    }
+    return BRIDGE_DAILY_DATA;
+  }
+  console.log('No real data, using sample');return generateSampleData();
+})();
 var filteredData=[];
 var charts={};
 
