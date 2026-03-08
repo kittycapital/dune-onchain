@@ -140,6 +140,7 @@ body{font-family:var(--hv-font-body);background:var(--hv-bg-base);color:var(--hv
   .kpi-label{font-size:9px}
 }
 </style>
+<script src="data/smart-money/smart_money_data.js"></script>
 </head>
 <body>
 
@@ -283,18 +284,18 @@ function generateSampleData(){
   return data;
 }
 
-var sampleTopTokens=[
-  {token:'USDT',volume:28400000000,count:892},
-  {token:'USDC',volume:21200000000,count:743},
-  {token:'ETH',volume:15800000000,count:621},
-  {token:'WBTC',volume:8900000000,count:312},
-  {token:'stETH',volume:6200000000,count:198},
-  {token:'DAI',volume:4100000000,count:156},
-  {token:'LINK',volume:2800000000,count:134},
-  {token:'UNI',volume:1900000000,count:98},
-  {token:'AAVE',volume:1400000000,count:72},
-  {token:'MKR',volume:980000000,count:45}
-];
+var sampleTopTokens=(function(){
+  if(typeof WHALE_TOP_TOKENS!=='undefined'&&WHALE_TOP_TOKENS.length>0){
+    return WHALE_TOP_TOKENS.map(function(t){return{token:t.token,volume:t.volume,count:t.count};});
+  }
+  return[
+    {token:'USDT',volume:28400000000,count:892},{token:'USDC',volume:21200000000,count:743},
+    {token:'ETH',volume:15800000000,count:621},{token:'WBTC',volume:8900000000,count:312},
+    {token:'stETH',volume:6200000000,count:198},{token:'DAI',volume:4100000000,count:156},
+    {token:'LINK',volume:2800000000,count:134},{token:'UNI',volume:1900000000,count:98},
+    {token:'AAVE',volume:1400000000,count:72},{token:'MKR',volume:980000000,count:45}
+  ];
+})();
 
 var sampleTransfers=[
   {time:'2시간 전',token:'USDT',amount:52000000,from:'0x47ac...f8e2',to:'Binance'},
@@ -329,7 +330,18 @@ Chart.register({
   }
 });
 
-var allData=generateSampleData();
+var allData=(function(){
+  if(typeof WHALE_DAILY_DATA!=='undefined'&&WHALE_DAILY_DATA.length>0){
+    console.log('Loading real whale data:',WHALE_DAILY_DATA.length,'rows');
+    return WHALE_DAILY_DATA.map(function(d){
+      var vol=d.whale_volume_usd||0;
+      var cexIn=vol*0.25;var cexOut=vol*0.22;
+      return{date:d.date,whale_count:d.whale_count||0,whale_volume_usd:vol,
+        cex_inflow_usd:cexIn,cex_outflow_usd:cexOut,cex_net_usd:cexIn-cexOut};
+    });
+  }
+  console.log('No real data, using sample');return generateSampleData();
+})();
 var filteredData=[];
 var charts={};
 
