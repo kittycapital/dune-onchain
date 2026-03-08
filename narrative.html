@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>크립토 내러티브 & 섹터 퍼포먼스 | HerdVibe</title>
+<meta name="description" content="AI, DePIN, RWA, Meme, L2, DeFi 등 크립토 섹터별 수익률을 실시간 추적합니다.">
+<meta property="og:title" content="크립토 내러티브 & 섹터 퍼포먼스 | HerdVibe">
+<meta property="og:description" content="어떤 내러티브가 시장을 이기고 있는지 한눈에 확인하세요.">
+<meta property="og:type" content="website">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
+<script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.1/kakao.min.js" crossorigin="anonymous" async></script>
+
+<style>
+:root {
+  --hv-primary:#3b82f6;--hv-primary-light:#60a5fa;--hv-primary-glow:rgba(59,130,246,0.12);
+  --hv-up:#22c55e;--hv-up-bg:rgba(34,197,94,0.08);
+  --hv-down:#ef4444;--hv-down-bg:rgba(239,68,68,0.08);
+  --hv-bg-base:#000;--hv-bg-surface:#0a0a0a;--hv-bg-card:#111;
+  --hv-bg-card-hover:#181818;
+  --hv-text-primary:#e5e5e5;--hv-text-secondary:#8a8a8a;
+  --hv-text-tertiary:#555;--hv-text-muted:#3a3a3a;
+  --hv-border:rgba(255,255,255,0.06);--hv-border-strong:rgba(255,255,255,0.12);
+  --hv-font-display:'Plus Jakarta Sans',sans-serif;
+  --hv-font-body:'Noto Sans KR',-apple-system,BlinkMacSystemFont,sans-serif;
+  --hv-font-mono:'JetBrains Mono','SF Mono',monospace;
+  --hv-space-lg:24px;
+  --hv-radius-lg:14px;
+  --hv-shadow-sm:0 1px 3px rgba(0,0,0,.5);
+  --hv-transition-fast:150ms ease;
+  --hv-max-width:1280px;
+  --accent-cyan:#00e5cc;--accent-green:#22c55e;--accent-red:#ef4444;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body{font-family:var(--hv-font-body);background:var(--hv-bg-base);color:var(--hv-text-primary);line-height:1.6;overflow-x:hidden}
+::selection{background:var(--hv-primary);color:#fff}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--hv-bg-base)}
+::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
+
+.dc{max-width:var(--hv-max-width);margin:0 auto;padding:var(--hv-space-lg)}
+.header{text-align:center;padding:28px 0 24px;border-bottom:1px solid var(--hv-border);margin-bottom:var(--hv-space-lg)}
+.header h1{font-family:var(--hv-font-display);font-size:22px;font-weight:700;color:#fff;letter-spacing:-0.3px;margin-bottom:6px}
+.header .sub{font-size:12px;color:var(--hv-text-secondary);font-weight:300}
+.header .sub span{color:var(--accent-cyan);font-family:var(--hv-font-mono);font-size:11px}
+
+/* Heatmap Table */
+.heatmap-wrap{overflow-x:auto;margin-bottom:20px}
+.heatmap{width:100%;border-collapse:collapse;font-size:13px}
+.heatmap th{font-family:var(--hv-font-mono);font-size:10px;color:var(--hv-text-muted);text-transform:uppercase;letter-spacing:1px;padding:10px 12px;border-bottom:1px solid var(--hv-border);font-weight:500;text-align:center;white-space:nowrap}
+.heatmap th:first-child,.heatmap th:nth-child(2){text-align:left}
+.heatmap td{padding:10px 12px;border-bottom:1px solid var(--hv-border);font-family:var(--hv-font-mono);font-size:12px;text-align:center;white-space:nowrap}
+.heatmap tr:hover{background:var(--hv-bg-card-hover)}
+.heatmap .sector-name{font-family:var(--hv-font-body);font-weight:600;color:#fff;text-align:left;font-size:13px}
+.heatmap .sector-tokens{font-family:var(--hv-font-mono);font-size:10px;color:var(--hv-text-tertiary);text-align:left;max-width:180px;overflow:hidden;text-overflow:ellipsis}
+.pct-cell{border-radius:4px;padding:6px 10px !important;font-weight:600;font-size:12px}
+.pct-up{background:var(--hv-up-bg);color:var(--hv-up)}
+.pct-down{background:var(--hv-down-bg);color:var(--hv-down)}
+.pct-flat{color:var(--hv-text-muted)}
+
+.chart-row{display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:14px}
+.card{background:var(--hv-bg-card);border:1px solid var(--hv-border);border-radius:var(--hv-radius-lg);padding:18px 20px 16px;position:relative;overflow:hidden}
+.card-title{font-size:15px;font-weight:700;margin-bottom:2px;text-align:center;color:#fff}
+.card-desc{font-size:11.5px;color:var(--hv-text-secondary);margin-bottom:14px;text-align:center}
+.chart-wrap{position:relative;width:100%;height:400px}
+.chart-wrap canvas{width:100%!important;height:100%!important}
+.watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--hv-font-mono);font-size:48px;font-weight:700;color:rgba(255,255,255,0.02);pointer-events:none;white-space:nowrap;letter-spacing:4px}
+
+/* Period tabs */
+.tabs{display:flex;justify-content:center;gap:4px;margin-bottom:20px}
+.tab{padding:5px 12px;border-radius:6px;font-family:var(--hv-font-mono);font-size:10.5px;font-weight:500;color:var(--hv-text-muted);background:transparent;border:1px solid transparent;cursor:pointer;transition:all .2s;user-select:none}
+.tab:hover{color:var(--hv-text-secondary);background:rgba(255,255,255,.03)}
+.tab.active{color:var(--accent-cyan);background:rgba(0,229,204,.08);border-color:rgba(0,229,204,.2)}
+
+/* Legend chips */
+.legend{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-bottom:14px}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-family:var(--hv-font-mono);font-size:10px;color:#ccc;border:1px solid var(--hv-border);cursor:pointer;transition:all .15s;user-select:none}
+.chip .dot{width:8px;height:8px;border-radius:50%}
+.chip.active{border-color:rgba(255,255,255,.2);background:rgba(255,255,255,.04)}
+.chip.inactive{opacity:.35}
+
+.share-bar{display:flex;align-items:center;justify-content:center;padding:12px var(--hv-space-lg);border-top:1px solid var(--hv-border);background:var(--hv-bg-surface);border-radius:0 0 var(--hv-radius-lg) var(--hv-radius-lg);margin-top:24px}
+.share-bar-buttons{display:flex;align-items:center;gap:6px}
+.share-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;font-size:.75rem;font-weight:600;font-family:var(--hv-font-body);cursor:pointer;transition:all var(--hv-transition-fast);border:1px solid var(--hv-border-strong);background:var(--hv-bg-card);color:#999;white-space:nowrap}
+.share-btn:hover{transform:translateY(-1px);box-shadow:var(--hv-shadow-sm);color:var(--hv-text-primary)}
+.share-btn svg{flex-shrink:0}
+.share-btn--x:hover{border-color:#fff;color:#fff;background:#111}
+.share-btn--kakao:hover{border-color:#FEE500;color:#191919;background:#FEE500}
+.share-btn--tg:hover{border-color:#26A5E4;color:#fff;background:rgba(38,165,228,.15)}
+.share-btn--copy:hover{border-color:var(--hv-primary);color:var(--hv-primary-light);background:var(--hv-primary-glow)}
+.hv-toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--accent-cyan);color:#000;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:all .3s;z-index:999}
+.hv-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.data-source{text-align:center;font-size:11px;color:var(--hv-text-muted);margin-top:16px;font-family:var(--hv-font-mono)}
+.data-source a{color:var(--accent-cyan);text-decoration:none}
+
+@media(max-width:768px){
+  .dc{padding:16px 12px}.header h1{font-size:18px}.card{padding:16px 12px}
+  .heatmap{font-size:11px}.heatmap th,.heatmap td{padding:8px 8px}
+  .sector-tokens{display:none}
+  .share-bar-buttons{flex-wrap:wrap;justify-content:center}
+  .share-btn span.label-text{display:none}.share-btn{padding:8px 10px}
+  .chart-wrap{height:320px}
+}
+@media(max-width:480px){.heatmap .pct-cell{padding:4px 6px!important;font-size:11px}}
+</style>
+</head>
+<body>
+<div class="dc">
+
+  <div class="header">
+    <h1>크립토 내러티브 & 섹터 퍼포먼스</h1>
+    <div class="sub">
+      AI · DePIN · RWA · Meme · L2 · DeFi · GameFi 섹터별 수익률 비교 &nbsp;|&nbsp;
+      <span id="lastUpdate">업데이트: --</span>
+    </div>
+  </div>
+
+  <!-- Heatmap Table -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">섹터별 수익률 히트맵</div>
+    <div class="card-desc">BTC 대비 상대 퍼포먼스 · 섹터 평균 수익률</div>
+    <div class="heatmap-wrap">
+      <table class="heatmap" id="heatmapTable">
+        <thead><tr><th>섹터</th><th>구성 토큰</th><th>7D</th><th>14D</th><th>30D</th><th>90D</th><th>YTD</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Sector Time Series Chart -->
+  <div class="chart-row">
+    <div class="card">
+      <div class="watermark">HERDVIBE</div>
+      <div class="card-title">섹터별 누적 수익률 추이</div>
+      <div class="card-desc">기간 시작점 = 0% 기준 · BTC 포함 비교</div>
+      <div class="tabs" id="chartTabs">
+        <button class="tab" data-days="7">7일</button>
+        <button class="tab" data-days="14">14일</button>
+        <button class="tab active" data-days="30">30일</button>
+        <button class="tab" data-days="90">90일</button>
+      </div>
+      <div class="legend" id="legendWrap"></div>
+      <div class="chart-wrap"><canvas id="chartSector"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Top/Bottom Performers -->
+  <div class="chart-row" style="display:grid;grid-template-columns:1fr;gap:14px">
+    <div class="card">
+      <div class="watermark">HERDVIBE</div>
+      <div class="card-title">30일 개별 토큰 수익률 TOP / BOTTOM</div>
+      <div class="card-desc">섹터 내 개별 토큰 기준 · 상위 10 / 하위 10</div>
+      <div class="chart-wrap" style="height:350px"><canvas id="chartTopBottom"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Share -->
+  <div class="share-bar">
+    <div class="share-bar-buttons">
+      <button class="share-btn share-btn--x" onclick="doShare('twitter')"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg><span class="label-text">트위터</span></button>
+      <button class="share-btn share-btn--kakao" onclick="doShare('kakao')"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C6.477 3 2 6.463 2 10.691c0 2.724 1.8 5.112 4.508 6.458l-1.148 4.265a.5.5 0 0 0 .764.533l4.94-3.26c.304.02.612.03.936.03 5.523 0 10-3.462 10-7.735C22 6.463 17.523 3 12 3z"/></svg><span class="label-text">카카오톡</span></button>
+      <button class="share-btn share-btn--tg" onclick="doShare('telegram')"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg><span class="label-text">텔레그램</span></button>
+      <button class="share-btn" onclick="doShare('instagram',this)" style="border-color:var(--hv-border-strong)"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg><span class="label-text">인스타</span></button>
+      <button class="share-btn share-btn--copy" onclick="doShare('link',this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="label-text">링크 복사</span></button>
+    </div>
+  </div>
+  <div class="hv-toast" id="hvToast"></div>
+  <div class="data-source">Data: <a href="https://dune.com" target="_blank">Dune Analytics</a> · prices.day · Updated Daily via GitHub Actions</div>
+</div>
+
+<script>
+// ═══ SHARE ═══
+var SHARE_URL='https://herdvibe.com/124';
+function ensureKakao(){try{if(typeof Kakao!=='undefined'&&!Kakao.isInitialized())Kakao.init('a43ed7b39fac35458f4f9df925a279b5');return typeof Kakao!=='undefined'&&Kakao.isInitialized();}catch(e){return false;}}
+ensureKakao();
+function kakaoShare(){if(!ensureKakao()){copyToClipboard(SHARE_URL);toast('링크 복사완료!');return;}try{Kakao.Share.sendDefault({objectType:'feed',content:{title:'크립토 내러티브 & 섹터 퍼포먼스',description:'AI, DePIN, RWA, Meme, L2, DeFi 섹터별 수익률 비교',imageUrl:'',link:{mobileWebUrl:SHARE_URL,webUrl:SHARE_URL}},buttons:[{title:'대시보드 보기',link:{mobileWebUrl:SHARE_URL,webUrl:SHARE_URL}}]});}catch(e){copyToClipboard(SHARE_URL);toast('링크 복사완료!');}}
+function copyToClipboard(t){try{if(navigator.clipboard)navigator.clipboard.writeText(t);else{var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();document.execCommand('copy');document.body.removeChild(a);}window.parent.postMessage({type:'clipboard',text:t},'*');}catch(e){}}
+function toast(m){var e=document.getElementById('hvToast');e.textContent=m;e.classList.add('show');setTimeout(function(){e.classList.remove('show');},2500);}
+function flashCopied(b){if(!b)return;var o=b.innerHTML;b.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span class="label-text">복사됨</span>';setTimeout(function(){b.innerHTML=o;},1500);}
+function doShare(p,b){var u=SHARE_URL,t=encodeURIComponent('크립토 내러티브 & 섹터 퍼포먼스 | herdvibe.com'),eu=encodeURIComponent(u);switch(p){case'twitter':window.open('https://twitter.com/intent/tweet?text='+t+'&url='+eu,'_blank');break;case'telegram':window.open('https://t.me/share/url?url='+eu+'&text='+t,'_blank');break;case'kakao':kakaoShare();break;case'instagram':copyToClipboard(u);flashCopied(b);toast('링크 복사완료! 인스타그램에 붙여넣기 하세요');break;case'link':copyToClipboard(u);flashCopied(b);toast('링크가 복사되었습니다 ✓');break;}}
+
+// ═══ SECTORS & SAMPLE DATA ═══
+var SECTORS=[
+  {name:'AI',tokens:['FET','RENDER','TAO','NEAR','WLD'],color:'#a855f7'},
+  {name:'DePIN',tokens:['HNT','IOTX','RNDR','AR','FIL'],color:'#00e5cc'},
+  {name:'RWA',tokens:['ONDO','MKR','COMP','SNX','PENDLE'],color:'#4a9eff'},
+  {name:'Meme',tokens:['DOGE','SHIB','PEPE','WIF','BONK'],color:'#ffd740'},
+  {name:'L2',tokens:['ARB','OP','STRK','MATIC','IMX'],color:'#ff6b35'},
+  {name:'DeFi',tokens:['UNI','AAVE','CRV','LDO','SUSHI'],color:'#22c55e'},
+  {name:'GameFi',tokens:['AXS','SAND','MANA','GALA','ILV'],color:'#f43f5e'},
+  {name:'BTC',tokens:['BTC'],color:'#f7931a'}
+];
+var COLORS=SECTORS.map(function(s){return s.color;});
+
+function generateSectorData(){
+  var seed=99;function rand(){seed=(seed*16807)%2147483647;return(seed-1)/2147483646;}
+  var result={};
+  SECTORS.forEach(function(sec){
+    var daily=[];var base=100;
+    for(var i=0;i<90;i++){
+      var d=new Date('2024-12-10');d.setDate(d.getDate()+i);
+      var drift=(sec.name==='AI'?0.3:sec.name==='Meme'?0.5:sec.name==='BTC'?0.15:0.1);
+      var vol=(sec.name==='Meme'?4:sec.name==='AI'?2.5:1.5);
+      base=base*(1+(rand()-0.48)*vol/100+drift/100);
+      daily.push({date:d.toISOString().split('T')[0],index:Math.round(base*100)/100});
+    }
+    result[sec.name]=daily;
+  });
+  return result;
+}
+
+var sectorData=generateSectorData();
+
+function calcReturn(arr,days){
+  if(!arr||arr.length<days)return 0;
+  var end=arr[arr.length-1].index;
+  var start=arr[arr.length-1-days]?arr[arr.length-1-days].index:arr[0].index;
+  return start>0?Math.round((end/start-1)*10000)/100:0;
+}
+
+// ═══ HEATMAP ═══
+function renderHeatmap(){
+  var tbody=document.querySelector('#heatmapTable tbody');
+  var rows=SECTORS.map(function(sec){
+    var d=sectorData[sec.name];
+    var r7=calcReturn(d,7),r14=calcReturn(d,14),r30=calcReturn(d,30),r90=calcReturn(d,Math.min(90,d.length-1));
+    var ytd=calcReturn(d,d.length-1);
+    function cell(v){var cls=v>0?'pct-up':v<0?'pct-down':'pct-flat';return '<td class="pct-cell '+cls+'">'+(v>0?'+':'')+v.toFixed(1)+'%</td>';}
+    return '<tr><td class="sector-name" style="border-left:3px solid '+sec.color+';padding-left:14px">'+sec.name+'</td><td class="sector-tokens">'+sec.tokens.join(', ')+'</td>'+cell(r7)+cell(r14)+cell(r30)+cell(r90)+cell(ytd)+'</tr>';
+  });
+  tbody.innerHTML=rows.join('');
+}
+
+// ═══ CHART ═══
+Chart.defaults.color='#555';
+Chart.defaults.borderColor='rgba(255,255,255,0.06)';
+Chart.defaults.font.family="'JetBrains Mono','Noto Sans KR',monospace";
+Chart.defaults.font.size=11;
+Chart.defaults.plugins.tooltip.backgroundColor='#1a1a1a';
+Chart.defaults.plugins.tooltip.borderColor='rgba(255,255,255,0.12)';
+Chart.defaults.plugins.tooltip.borderWidth=1;
+Chart.defaults.plugins.tooltip.cornerRadius=8;
+Chart.defaults.plugins.tooltip.padding=10;
+
+Chart.register({id:'zeroLine',afterDraw:function(c){var y=c.scales.y;if(!y)return;var yy=y.getPixelForValue(0);if(yy<c.chartArea.top||yy>c.chartArea.bottom)return;var ctx=c.ctx;ctx.save();ctx.strokeStyle='rgba(255,255,255,0.1)';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(c.chartArea.left,yy);ctx.lineTo(c.chartArea.right,yy);ctx.stroke();ctx.restore();}});
+
+var chartSector=null,chartTB=null;
+var visibleSectors=SECTORS.map(function(){return true;});
+var currentDays=30;
+
+function buildLegend(){
+  var wrap=document.getElementById('legendWrap');
+  wrap.innerHTML=SECTORS.map(function(s,i){
+    return '<span class="chip '+(visibleSectors[i]?'active':'inactive')+'" data-idx="'+i+'"><span class="dot" style="background:'+s.color+'"></span>'+s.name+'</span>';
+  }).join('');
+  wrap.querySelectorAll('.chip').forEach(function(el){
+    el.addEventListener('click',function(){
+      var idx=parseInt(this.dataset.idx);
+      visibleSectors[idx]=!visibleSectors[idx];
+      this.className='chip '+(visibleSectors[idx]?'active':'inactive');
+      rebuildSectorChart();
+    });
+  });
+}
+
+function rebuildSectorChart(){
+  if(chartSector){chartSector.destroy();chartSector=null;}
+  var days=currentDays;
+  var datasets=[];
+  SECTORS.forEach(function(sec,i){
+    if(!visibleSectors[i])return;
+    var d=sectorData[sec.name].slice(-days);
+    var startVal=d[0].index;
+    datasets.push({
+      label:sec.name,
+      data:d.map(function(p){return Math.round((p.index/startVal-1)*10000)/100;}),
+      borderColor:sec.color,
+      backgroundColor:'transparent',
+      tension:0.3,pointRadius:0,pointHitRadius:8,borderWidth:sec.name==='BTC'?3:2,
+      borderDash:sec.name==='BTC'?[6,3]:[]
+    });
+  });
+  var labels=sectorData[SECTORS[0].name].slice(-days).map(function(d){var dt=new Date(d.date);return(dt.getMonth()+1)+'/'+dt.getDate();});
+
+  chartSector=new Chart(document.getElementById('chartSector'),{
+    type:'line',
+    data:{labels:labels,datasets:datasets},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:400},
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return ctx.dataset.label+': '+(ctx.parsed.y>=0?'+':'')+ctx.parsed.y.toFixed(1)+'%';}}},
+        zoom:{zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'x'},pan:{enabled:true,mode:'x'}}},
+      scales:{x:{grid:{display:false},ticks:{maxTicksLimit:10,maxRotation:0,font:{size:10}}},
+        y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:function(v){return(v>=0?'+':'')+v.toFixed(0)+'%';}}}}
+    }
+  });
+}
+
+function rebuildTopBottom(){
+  if(chartTB){chartTB.destroy();chartTB=null;}
+  // Generate individual token returns
+  var allTokens=[];
+  SECTORS.forEach(function(sec){
+    if(sec.name==='BTC')return;
+    var d=sectorData[sec.name];
+    var secReturn=calcReturn(d,30);
+    sec.tokens.forEach(function(tok){
+      var spread=(Math.random()-0.5)*20;
+      allTokens.push({token:tok,sector:sec.name,ret:Math.round((secReturn+spread)*10)/10,color:sec.color});
+    });
+  });
+  allTokens.sort(function(a,b){return b.ret-a.ret;});
+  var top10=allTokens.slice(0,10);
+  var bot10=allTokens.slice(-10).reverse();
+  var combined=top10.concat(bot10);
+
+  chartTB=new Chart(document.getElementById('chartTopBottom'),{
+    type:'bar',
+    data:{
+      labels:combined.map(function(t){return t.token;}),
+      datasets:[{
+        data:combined.map(function(t){return t.ret;}),
+        backgroundColor:combined.map(function(t){return t.ret>=0?'rgba(34,197,94,0.5)':'rgba(239,68,68,0.5)';}),
+        borderColor:combined.map(function(t){return t.ret>=0?'rgba(34,197,94,0.8)':'rgba(239,68,68,0.8)';}),
+        borderWidth:1,borderRadius:3
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:400},indexAxis:'y',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return(ctx.parsed.x>=0?'+':'')+ctx.parsed.x.toFixed(1)+'%';}}}},
+      scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:function(v){return(v>=0?'+':'')+v+'%';}}},
+        y:{grid:{display:false},ticks:{font:{size:11,family:"'JetBrains Mono',monospace"},color:'#ccc'}}}
+    }
+  });
+}
+
+// ═══ TABS ═══
+document.querySelectorAll('.tab').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.tab').forEach(function(b){b.classList.remove('active');});
+    this.classList.add('active');
+    currentDays=parseInt(this.dataset.days);
+    rebuildSectorChart();
+  });
+});
+
+// ═══ INIT ═══
+renderHeatmap();
+buildLegend();
+rebuildSectorChart();
+rebuildTopBottom();
+document.getElementById('lastUpdate').textContent='업데이트: '+sectorData.BTC[sectorData.BTC.length-1].date;
+
+var _lastH=0,_timer=null;
+function sendHeight(){if(_timer)return;_timer=setTimeout(function(){_timer=null;var h=document.documentElement.scrollHeight;if(Math.abs(h-_lastH)>5){_lastH=h;window.parent.postMessage({type:'herdvibe-height',height:h},'*');}},500);}
+window.addEventListener('load',function(){setTimeout(sendHeight,1000);});
+</script>
+</body>
+</html>
