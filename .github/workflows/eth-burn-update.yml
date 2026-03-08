@@ -1,14 +1,12 @@
 # .github/workflows/eth-burn-update.yml
 # ETH Burn Dashboard — Daily Data Update
-# Dune API에서 ETH 소각 데이터를 가져와 CSV/JS로 저장
 
 name: ETH Burn Data Update
 
 on:
   schedule:
-    # 매일 UTC 06:00 (KST 15:00) 실행
     - cron: '0 6 * * *'
-  workflow_dispatch: # 수동 실행 가능
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -33,7 +31,7 @@ jobs:
       - name: Fetch ETH burn data from Dune
         env:
           DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
-        run: python fetch_eth_burn.py
+        run: python scripts/fetch_eth_burn.py
 
       - name: Commit and push data
         run: |
