@@ -1,6 +1,4 @@
 # .github/workflows/eth-burn-update.yml
-# ETH Burn Dashboard — Daily Data Update
-
 name: ETH Burn Data Update
 
 on:
@@ -14,7 +12,7 @@ permissions:
 jobs:
   fetch-data:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -26,7 +24,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install requests dune-client
+        run: pip install requests
 
       - name: Fetch ETH burn data from Dune
         env:
