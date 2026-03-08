@@ -144,6 +144,7 @@ body{font-family:var(--hv-font-body);background:var(--hv-bg-base);color:var(--hv
   .burner-bar-cell{display:none}
 }
 </style>
+<script src="data/eth-burn/eth_burn_data.js"></script>
 </head>
 <body>
 
@@ -293,13 +294,18 @@ function generateSampleData(){
   return data;
 }
 
-var topBurners=[
-  {name:'Uniswap V3',burn:18420,pct:14.2},{name:'ETH Transfers',burn:15890,pct:12.3},
-  {name:'Tether (USDT)',burn:9870,pct:7.6},{name:'Uniswap Universal Router',burn:8340,pct:6.4},
-  {name:'1inch',burn:5620,pct:4.3},{name:'OpenSea',burn:4980,pct:3.8},
-  {name:'MetaMask Swap',burn:4210,pct:3.2},{name:'Banana Gun',burn:3850,pct:3.0},
-  {name:'Aave V3',burn:3120,pct:2.4},{name:'USDC (Circle)',burn:2760,pct:2.1}
-];
+var topBurners=(function(){
+  if(typeof ETH_TOP_BURNERS!=='undefined'&&ETH_TOP_BURNERS.length>0){
+    return ETH_TOP_BURNERS.map(function(b){return{name:b.protocol_name,burn:b.burn_eth,pct:b.burn_pct};});
+  }
+  return[
+    {name:'Uniswap V3',burn:18420,pct:14.2},{name:'ETH Transfers',burn:15890,pct:12.3},
+    {name:'Tether (USDT)',burn:9870,pct:7.6},{name:'Uniswap Universal Router',burn:8340,pct:6.4},
+    {name:'1inch',burn:5620,pct:4.3},{name:'OpenSea',burn:4980,pct:3.8},
+    {name:'MetaMask Swap',burn:4210,pct:3.2},{name:'Banana Gun',burn:3850,pct:3.0},
+    {name:'Aave V3',burn:3120,pct:2.4},{name:'USDC (Circle)',burn:2760,pct:2.1}
+  ];
+})();
 
 Chart.defaults.color='#555';
 Chart.defaults.borderColor='rgba(255,255,255,0.06)';
@@ -328,7 +334,18 @@ Chart.register({
   }
 });
 
-var allData=generateSampleData();
+var allData=(function(){
+  if(typeof ETH_BURN_DATA!=='undefined'&&ETH_BURN_DATA.length>0){
+    console.log('Loading real ETH burn data:',ETH_BURN_DATA.length,'rows');
+    return ETH_BURN_DATA.map(function(d){
+      var burn=d.daily_burn_eth||0;var iss=d.daily_issuance_eth||1800;
+      return{date:d.date,daily_burn:burn,daily_issuance:iss,net_change:iss-burn,
+        cumulative_burn:d.cumulative_burn_eth||0,staking_ratio:d.staking_ratio_pct||28,
+        annual_inflation:((iss-burn)*365/120220000)*100};
+    });
+  }
+  console.log('No real data, using sample');return generateSampleData();
+})();
 var filteredData=[];
 var charts={};
 
