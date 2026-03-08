@@ -1,17 +1,12 @@
 """
 ETH Burn Dashboard — Dune API Data Pipeline
 ============================================
-GitHub Actions에서 매일 실행하여 Dune 쿼리 결과를 CSV로 저장.
-생성된 CSV를 eth-burn.html이 fetch하여 Chart.js로 렌더링.
+Dune API로 직접 SQL 실행 → CSV/JS 저장.
+Dune에서 수동으로 쿼리 만들 필요 없음 — API 키만 있으면 됨.
 
-사용법:
-  pip install dune-client requests
-  export DUNE_API_KEY=your_key_here
+Usage:
+  export DUNE_API_KEY=your_key
   python scripts/fetch_eth_burn.py
-
-Dune 쿼리 셋업 필요:
-  1. dune.com에서 아래 4개 쿼리를 생성하고 저장
-  2. 각 query_id를 아래 QUERY_IDS에 입력
 """
 
 import os
@@ -21,212 +16,226 @@ import time
 import requests
 from datetime import datetime, timezone
 
-# ─── Configuration ───────────────────────────────
 DUNE_API_KEY = os.environ.get("DUNE_API_KEY", "")
 BASE_URL = "https://api.dune.com/api/v1"
 OUTPUT_DIR = "data/eth-burn"
+HEADERS = {"x-dune-api-key": DUNE_API_KEY, "Content-Type": "application/json"}
 
-# Dune에서 쿼리 생성 후 query_id를 여기에 입력
-# 아래는 예시 ID — 실제 쿼리 생성 후 교체 필요
-QUERY_IDS = {
-    "daily_burn": 0,        # 일별 소각량 + 발행량 + 순 변화
-    "cumulative_burn": 0,   # 누적 소각량
-    "staking_ratio": 0,     # 스테이킹 비율
-    "top_burners": 0,       # TOP 소각 프로토콜
-}
+# ─── SQL Queries ─────────────────────────────────
 
-# ─── Dune SQL Queries (참고용 — Dune UI에서 저장) ──
-QUERIES_SQL = {
-    "daily_burn": """
--- 일별 ETH 소각량 + PoS 발행량 + 순 공급 변화
+QUERY_DAILY_BURN = """
 SELECT
-    date_trunc('day', block_time) AS date,
-    SUM(base_fee_per_gas * gas_used) / 1e18 AS daily_burn_eth,
-    1800 AS daily_issuance_eth,
-    1800 - SUM(base_fee_per_gas * gas_used) / 1e18 AS net_change_eth
+  date_trunc('day', time) AS date,
+  SUM(base_fee_per_gas * gas_used) / 1e18 AS daily_burn_eth
 FROM ethereum.blocks
-WHERE block_time >= DATE_ADD('day', -365, CURRENT_DATE)
+WHERE time >= now() - interval '400' day
 GROUP BY 1
 ORDER BY 1
-""",
+"""
 
-    "cumulative_burn": """
--- 누적 소각량 (EIP-1559 시작점부터)
+QUERY_CUMULATIVE_BURN = """
 SELECT
-    date_trunc('day', block_time) AS date,
-    SUM(SUM(base_fee_per_gas * gas_used) / 1e18)
-        OVER (ORDER BY date_trunc('day', block_time)) AS cumulative_burn_eth
-FROM ethereum.blocks
-WHERE block_time >= DATE '2021-08-05'
-GROUP BY 1
+  d.date,
+  SUM(d.daily_burn) OVER (ORDER BY d.date) AS cumulative_burn_eth
+FROM (
+  SELECT
+    date_trunc('day', time) AS date,
+    SUM(base_fee_per_gas * gas_used) / 1e18 AS daily_burn
+  FROM ethereum.blocks
+  WHERE time >= DATE '2021-08-05'
+  GROUP BY 1
+) d
 ORDER BY 1
-""",
+"""
 
-    "staking_ratio": """
--- ETH 스테이킹 비율
+QUERY_TOP_BURNERS = """
 SELECT
-    date,
-    total_staked_eth,
-    total_supply_eth,
-    (total_staked_eth / total_supply_eth * 100) AS staking_ratio_pct
-FROM dune.ethereum_staking_daily
-WHERE date >= DATE_ADD('day', -365, CURRENT_DATE)
-ORDER BY date
-""",
-
-    "top_burners": """
--- 30일간 가스비 소각 TOP 프로토콜
-SELECT
-    COALESCE(l.name, CAST(t."to" AS VARCHAR)) AS protocol_name,
-    SUM(t.gas_used * b.base_fee_per_gas) / 1e18 AS burn_eth,
-    SUM(t.gas_used * b.base_fee_per_gas) / 1e18
-        / (SELECT SUM(base_fee_per_gas * gas_used) / 1e18
-           FROM ethereum.blocks
-           WHERE block_time >= DATE_ADD('day', -30, CURRENT_DATE))
-        * 100 AS burn_pct
+  COALESCE(
+    n.namespace,
+    CAST(t."to" AS VARCHAR)
+  ) AS protocol_name,
+  SUM(t.gas_used * b.base_fee_per_gas) / 1e18 AS burn_eth
 FROM ethereum.transactions t
-JOIN ethereum.blocks b ON t.block_number = b.number
-LEFT JOIN labels.contracts l ON t."to" = l.address AND l.blockchain = 'ethereum'
-WHERE t.block_time >= DATE_ADD('day', -30, CURRENT_DATE)
+JOIN ethereum.blocks b
+  ON t.block_number = b.number
+  AND b.time >= now() - interval '30' day
+LEFT JOIN ethereum.contracts c
+  ON t."to" = c.address
+LEFT JOIN dune.namespaces n
+  ON c.namespace = n.namespace
+  AND n.blockchain = 'ethereum'
+WHERE t.block_time >= now() - interval '30' day
 GROUP BY 1
 ORDER BY 2 DESC
 LIMIT 15
 """
-}
 
-# ─── Helper Functions ────────────────────────────
+# ─── API Functions ───────────────────────────────
 
-def dune_get(endpoint, params=None):
-    """Dune API GET request with retry"""
-    headers = {"x-dune-api-key": DUNE_API_KEY}
-    for attempt in range(3):
-        try:
-            resp = requests.get(
-                f"{BASE_URL}{endpoint}",
-                headers=headers,
-                params=params,
-                timeout=30
-            )
-            if resp.status_code == 200:
-                return resp.json()
-            elif resp.status_code == 429:
-                wait = 2 ** (attempt + 1)
-                print(f"  Rate limited, waiting {wait}s...")
-                time.sleep(wait)
-            else:
-                print(f"  Error {resp.status_code}: {resp.text[:200]}")
-                return None
-        except Exception as e:
-            print(f"  Request error: {e}")
-            time.sleep(2)
+def execute_query(sql, name):
+    """Execute SQL on Dune and return results."""
+    print(f"\n[{name}] Executing query...")
+
+    # Step 1: Execute
+    resp = requests.post(
+        f"{BASE_URL}/query/execute/sql",
+        headers=HEADERS,
+        json={
+            "query_sql": sql,
+            "performance": "medium"
+        },
+        timeout=30
+    )
+
+    if resp.status_code != 200:
+        print(f"  ✗ Execute failed: {resp.status_code} {resp.text[:300]}")
+        return None
+
+    data = resp.json()
+    execution_id = data.get("execution_id")
+    if not execution_id:
+        print(f"  ✗ No execution_id: {data}")
+        return None
+
+    print(f"  → execution_id: {execution_id}")
+
+    # Step 2: Poll for results
+    for attempt in range(60):  # max 5 min
+        time.sleep(5)
+        resp = requests.get(
+            f"{BASE_URL}/execution/{execution_id}/results",
+            headers=HEADERS,
+            params={"limit": 10000},
+            timeout=30
+        )
+
+        if resp.status_code != 200:
+            print(f"  ✗ Poll error: {resp.status_code}")
+            continue
+
+        result = resp.json()
+        state = result.get("state", "")
+
+        if state == "QUERY_STATE_COMPLETED":
+            rows = result.get("result", {}).get("rows", [])
+            print(f"  ✓ Got {len(rows)} rows")
+            return rows
+        elif state == "QUERY_STATE_FAILED":
+            error = result.get("error", "Unknown error")
+            print(f"  ✗ Query failed: {error}")
+            return None
+        else:
+            if attempt % 4 == 0:
+                print(f"  ⏳ State: {state} (attempt {attempt+1})...")
+
+    print(f"  ✗ Timeout after 60 attempts")
     return None
 
 
-def fetch_query_result(query_id, name):
-    """
-    Get latest result for a saved query.
-    Uses 'get latest result' endpoint to minimize credit usage.
-    """
-    print(f"[{name}] Fetching query {query_id}...")
-
-    result = dune_get(f"/query/{query_id}/results", params={
-        "limit": 5000,
-    })
-
-    if not result or "result" not in result:
-        print(f"  ⚠ No result for {name}")
-        return []
-
-    rows = result["result"].get("rows", [])
-    print(f"  ✓ Got {len(rows)} rows")
-    return rows
-
-
-def save_csv(rows, filename, fieldnames=None):
-    """Save rows to CSV file"""
+def save_csv(rows, filename):
+    """Save rows to CSV."""
     if not rows:
-        print(f"  ⚠ No data to save for {filename}")
         return
-
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     filepath = os.path.join(OUTPUT_DIR, filename)
-
-    if not fieldnames:
-        fieldnames = list(rows[0].keys())
-
+    fieldnames = list(rows[0].keys())
     with open(filepath, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
-        for row in rows:
-            writer.writerow({k: row.get(k, "") for k in fieldnames})
-
-    print(f"  ✓ Saved {filepath} ({len(rows)} rows)")
+        writer.writerows(rows)
+    print(f"  ✓ Saved {filepath}")
 
 
-def generate_js_data(all_data):
-    """
-    JS 파일로 생성하여 HTML에서 바로 로드.
-    GitHub Pages에서 <script src="data/eth-burn/eth_burn_data.js"> 로 사용.
-    """
+def generate_js(daily_rows, cumulative_rows, burner_rows):
+    """Generate JS data file for HTML consumption."""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    js_content = f"""// Auto-generated by fetch_eth_burn.py
-// Last updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}
+    # Merge daily + cumulative by date
+    cum_map = {}
+    if cumulative_rows:
+        for r in cumulative_rows:
+            d = str(r.get("date", ""))[:10]
+            cum_map[d] = r.get("cumulative_burn_eth", 0)
 
-const ETH_BURN_DATA = {json.dumps(all_data.get('daily_burn', []), indent=2, default=str)};
+    merged = []
+    if daily_rows:
+        for r in daily_rows:
+            d = str(r.get("date", ""))[:10]
+            burn = float(r.get("daily_burn_eth", 0))
+            issuance = 1800  # PoS ~1800 ETH/day estimate
+            merged.append({
+                "date": d,
+                "daily_burn_eth": round(burn, 2),
+                "daily_issuance_eth": issuance,
+                "net_change_eth": round(issuance - burn, 2),
+                "cumulative_burn_eth": round(float(cum_map.get(d, 0)), 2),
+                "staking_ratio_pct": 28.0  # placeholder — can add beacon query later
+            })
 
-const ETH_CUMULATIVE_DATA = {json.dumps(all_data.get('cumulative_burn', []), indent=2, default=str)};
+    # Burners
+    burners = []
+    if burner_rows:
+        total = sum(float(r.get("burn_eth", 0)) for r in burner_rows)
+        for r in burner_rows:
+            burn = float(r.get("burn_eth", 0))
+            burners.append({
+                "protocol_name": r.get("protocol_name", "Unknown"),
+                "burn_eth": round(burn, 2),
+                "burn_pct": round(burn / total * 100, 1) if total > 0 else 0
+            })
 
-const ETH_STAKING_DATA = {json.dumps(all_data.get('staking_ratio', []), indent=2, default=str)};
+    now_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
 
-const ETH_TOP_BURNERS = {json.dumps(all_data.get('top_burners', []), indent=2, default=str)};
+    js = f"""// Auto-generated by fetch_eth_burn.py
+// Last updated: {now_str}
+
+const ETH_BURN_DATA = {json.dumps(merged, indent=2)};
+
+const ETH_TOP_BURNERS = {json.dumps(burners, indent=2)};
 """
 
     filepath = os.path.join(OUTPUT_DIR, "eth_burn_data.js")
     with open(filepath, "w", encoding="utf-8") as f:
-        f.write(js_content)
-    print(f"  ✓ Generated {filepath}")
+        f.write(js)
+    print(f"\n  ✓ Generated {filepath}")
 
 
 # ─── Main ────────────────────────────────────────
 
 def main():
-    print("=" * 50)
-    print("ETH Burn Dashboard — Data Pipeline")
-    print(f"Time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
-    print("=" * 50)
+    print("=" * 55)
+    print("  ETH Burn Dashboard — Dune API Pipeline")
+    print(f"  {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
+    print("=" * 55)
 
     if not DUNE_API_KEY:
-        print("⚠ DUNE_API_KEY not set!")
-        print("  Set it: export DUNE_API_KEY=your_key")
-        print("  Generating sample data instead...")
-        generate_sample_data()
+        print("\n⚠ DUNE_API_KEY not set!")
+        print("  export DUNE_API_KEY=your_key")
+        print("  Generating sample data instead...\n")
+        generate_sample()
         return
 
-    # Check if query IDs are configured
-    unconfigured = [k for k, v in QUERY_IDS.items() if v == 0]
-    if unconfigured:
-        print(f"⚠ Query IDs not configured: {unconfigured}")
-        print("  1. Dune.com에서 위 SQL 쿼리를 생성하고 저장")
-        print("  2. QUERY_IDS에 query_id를 입력")
-        print("  Generating sample data instead...")
-        generate_sample_data()
-        return
+    # Execute queries
+    daily_rows = execute_query(QUERY_DAILY_BURN, "Daily Burn")
+    save_csv(daily_rows, "eth_daily_burn.csv")
 
-    all_data = {}
+    cumulative_rows = execute_query(QUERY_CUMULATIVE_BURN, "Cumulative Burn")
+    save_csv(cumulative_rows, "eth_cumulative_burn.csv")
 
-    for name, query_id in QUERY_IDS.items():
-        rows = fetch_query_result(query_id, name)
-        save_csv(rows, f"eth_{name}.csv")
-        all_data[name] = rows
-        time.sleep(1)
+    burner_rows = execute_query(QUERY_TOP_BURNERS, "Top Burners")
+    save_csv(burner_rows, "eth_top_burners.csv")
 
-    generate_js_data(all_data)
+    # Generate JS
+    generate_js(daily_rows, cumulative_rows, burner_rows)
 
+    # Metadata
     meta = {
         "last_updated": datetime.now(timezone.utc).isoformat(),
-        "queries": {k: v for k, v in QUERY_IDS.items()},
-        "row_counts": {k: len(v) for k, v in all_data.items()}
+        "rows": {
+            "daily": len(daily_rows or []),
+            "cumulative": len(cumulative_rows or []),
+            "burners": len(burner_rows or [])
+        }
     }
     with open(os.path.join(OUTPUT_DIR, "meta.json"), "w") as f:
         json.dump(meta, f, indent=2)
@@ -234,42 +243,39 @@ def main():
     print("\n✅ Pipeline complete!")
 
 
-def generate_sample_data():
-    """Dune API 키 없을 때 샘플 데이터 생성 (개발/테스트용)"""
+def generate_sample():
+    """API 키 없을 때 샘플 데이터 생성"""
     import math
-    import random
     from datetime import timedelta
 
-    random.seed(42)
-    print("\nGenerating sample data for development...")
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    data = []
+    cum = 4200000
+    seed = 42
 
-    daily_data = []
-    cumulative = 4346218
+    def rand():
+        nonlocal seed
+        seed = (seed * 16807) % 2147483647
+        return (seed - 1) / 2147483646
+
     start = datetime(2024, 3, 1)
-
     for i in range(370):
         date = start + timedelta(days=i)
         if date > datetime(2025, 3, 7):
             break
-
-        base = 1200 + math.sin(i * 0.05) * 400
-        noise = (random.random() - 0.3) * 800
-        spike = random.random() * 3000 if random.random() > 0.92 else 0
-        burn = max(300, base + noise + spike)
-        issuance = 1800 + (random.random() - 0.5) * 300
-        cumulative += burn
-        staking = 27.0 + (i / 370) * 1.5 + (random.random() - 0.5) * 0.1
-
-        daily_data.append({
+        burn = max(300, 1200 + math.sin(i * 0.05) * 400 + (rand() - 0.3) * 800 + (rand() * 3000 if rand() > 0.92 else 0))
+        iss = 1800 + (rand() - 0.5) * 300
+        cum += burn
+        data.append({
             "date": date.strftime("%Y-%m-%d"),
             "daily_burn_eth": round(burn, 2),
-            "daily_issuance_eth": round(issuance, 2),
-            "net_change_eth": round(issuance - burn, 2),
-            "cumulative_burn_eth": round(cumulative),
-            "staking_ratio_pct": round(staking, 2),
+            "daily_issuance_eth": round(iss, 2),
+            "net_change_eth": round(iss - burn, 2),
+            "cumulative_burn_eth": round(cum),
+            "staking_ratio_pct": round(27.0 + (i / 370) * 1.5 + (rand() - 0.5) * 0.1, 2)
         })
 
-    top_burners = [
+    burners = [
         {"protocol_name": "Uniswap V3", "burn_eth": 18420, "burn_pct": 14.2},
         {"protocol_name": "ETH Transfers", "burn_eth": 15890, "burn_pct": 12.3},
         {"protocol_name": "Tether (USDT)", "burn_eth": 9870, "burn_pct": 7.6},
@@ -279,23 +285,21 @@ def generate_sample_data():
         {"protocol_name": "MetaMask Swap", "burn_eth": 4210, "burn_pct": 3.2},
         {"protocol_name": "Banana Gun", "burn_eth": 3850, "burn_pct": 3.0},
         {"protocol_name": "Aave V3", "burn_eth": 3120, "burn_pct": 2.4},
-        {"protocol_name": "USDC (Circle)", "burn_eth": 2760, "burn_pct": 2.1},
+        {"protocol_name": "USDC (Circle)", "burn_eth": 2760, "burn_pct": 2.1}
     ]
 
-    all_data = {
-        "daily_burn": daily_data,
-        "cumulative_burn": [{"date": d["date"], "cumulative_burn_eth": d["cumulative_burn_eth"]} for d in daily_data],
-        "staking_ratio": [{"date": d["date"], "staking_ratio_pct": d["staking_ratio_pct"]} for d in daily_data],
-        "top_burners": top_burners,
-    }
+    now_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
+    js = f"""// Sample data (no API key)
+// Generated: {now_str}
 
-    save_csv(daily_data, "eth_daily_burn.csv")
-    save_csv(top_burners, "eth_top_burners.csv")
-    generate_js_data(all_data)
+const ETH_BURN_DATA = {json.dumps(data, indent=2)};
 
-    print("\n✅ Sample data generated!")
-    print(f"  → {OUTPUT_DIR}/eth_daily_burn.csv")
-    print(f"  → {OUTPUT_DIR}/eth_top_burners.csv")
+const ETH_TOP_BURNERS = {json.dumps(burners, indent=2)};
+"""
+    with open(os.path.join(OUTPUT_DIR, "eth_burn_data.js"), "w") as f:
+        f.write(js)
+
+    print("✅ Sample data generated!")
     print(f"  → {OUTPUT_DIR}/eth_burn_data.js")
 
 
