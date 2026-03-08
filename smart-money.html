@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>스마트머니 & 고래 트래커 | HerdVibe</title>
+<meta name="description" content="이더리움 온체인 고래 지갑 대형 전송, CEX 순유입/유출, 스마트머니가 매집하는 토큰을 실시간 추적합니다.">
+<meta property="og:title" content="스마트머니 & 고래 트래커 | HerdVibe">
+<meta property="og:description" content="$1M 이상 대형 전송, 고래 매집 토큰, 거래소 자금 흐름을 한눈에 확인하세요.">
+<meta property="og:type" content="website">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
+<script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.1/kakao.min.js" crossorigin="anonymous" async></script>
+
+<style>
+:root {
+  --hv-primary:#3b82f6;--hv-primary-light:#60a5fa;--hv-primary-dark:#2563eb;
+  --hv-primary-glow:rgba(59,130,246,0.12);
+  --hv-up:#22c55e;--hv-up-bg:rgba(34,197,94,0.1);
+  --hv-down:#ef4444;--hv-down-bg:rgba(239,68,68,0.1);
+  --hv-bg-base:#000;--hv-bg-surface:#0a0a0a;--hv-bg-card:#111;
+  --hv-bg-card-hover:#181818;--hv-bg-elevated:#1a1a1a;
+  --hv-text-primary:#e5e5e5;--hv-text-secondary:#8a8a8a;
+  --hv-text-tertiary:#555;--hv-text-muted:#3a3a3a;
+  --hv-border:rgba(255,255,255,0.06);--hv-border-strong:rgba(255,255,255,0.12);
+  --hv-font-display:'Plus Jakarta Sans',sans-serif;
+  --hv-font-body:'Noto Sans KR',-apple-system,BlinkMacSystemFont,sans-serif;
+  --hv-font-mono:'JetBrains Mono','SF Mono',monospace;
+  --hv-space-xs:8px;--hv-space-sm:12px;--hv-space-md:16px;
+  --hv-space-lg:24px;--hv-space-xl:32px;
+  --hv-radius-sm:6px;--hv-radius-md:10px;--hv-radius-lg:14px;
+  --hv-shadow-sm:0 1px 3px rgba(0,0,0,.5);
+  --hv-transition-fast:150ms ease;--hv-transition:250ms ease;
+  --hv-max-width:1280px;
+  --whale-color:#a855f7;
+  --whale-light:#c084fc;
+  --accent-cyan:#00e5cc;
+  --accent-green:#22c55e;
+  --accent-red:#ef4444;
+  --accent-yellow:#ffd740;
+  --accent-blue:#4a9eff;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;scroll-behavior:smooth;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body{font-family:var(--hv-font-body);background:var(--hv-bg-base);color:var(--hv-text-primary);line-height:1.6;min-height:100vh;overflow-x:hidden}
+::selection{background:var(--hv-primary);color:#fff}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--hv-bg-base)}
+::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
+
+.dashboard-container{max-width:var(--hv-max-width);margin:0 auto;padding:var(--hv-space-lg)}
+
+.dashboard-header{text-align:center;padding:28px 0 24px;border-bottom:1px solid var(--hv-border);margin-bottom:var(--hv-space-lg)}
+.dashboard-header h1{font-family:var(--hv-font-display);font-size:22px;font-weight:700;color:#fff;letter-spacing:-0.3px;margin-bottom:6px}
+.dashboard-header .subtitle{font-size:12px;color:var(--hv-text-secondary);font-weight:300}
+.dashboard-header .subtitle span{color:var(--accent-cyan);font-family:var(--hv-font-mono);font-size:11px}
+
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:var(--hv-space-lg)}
+.kpi-card{background:var(--hv-bg-card);border:1px solid var(--hv-border);border-radius:var(--hv-radius-lg);padding:18px 16px;text-align:center;transition:border-color var(--hv-transition-fast);animation:fadeUp .5s ease both}
+.kpi-card:nth-child(1){animation-delay:.05s}.kpi-card:nth-child(2){animation-delay:.08s}
+.kpi-card:nth-child(3){animation-delay:.11s}.kpi-card:nth-child(4){animation-delay:.14s}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.kpi-card:hover{border-color:var(--hv-border-strong)}
+.kpi-label{font-family:var(--hv-font-mono);font-size:10px;color:#ccc;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;font-weight:500}
+.kpi-value{font-family:var(--hv-font-mono);font-size:22px;font-weight:700;line-height:1.2}
+.kpi-sub{font-size:11px;color:var(--hv-text-secondary);margin-top:4px;font-family:var(--hv-font-mono)}
+.kpi-value.whale{color:var(--whale-color)}
+.kpi-value.up{color:var(--accent-green)}
+.kpi-value.down{color:var(--accent-red)}
+.kpi-value.neutral{color:var(--accent-cyan)}
+
+.period-bar{display:flex;justify-content:center;gap:4px;margin-bottom:20px}
+.period-btn{padding:5px 12px;border-radius:6px;font-family:var(--hv-font-mono);font-size:10.5px;font-weight:500;color:var(--hv-text-muted);background:transparent;border:1px solid transparent;cursor:pointer;transition:all .2s;user-select:none}
+.period-btn:hover{color:var(--hv-text-secondary);background:rgba(255,255,255,.03)}
+.period-btn.active{color:var(--accent-cyan);background:rgba(0,229,204,.08);border-color:rgba(0,229,204,.2)}
+
+.chart-row{display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:14px}
+.chart-panel{background:var(--hv-bg-card);border:1px solid var(--hv-border);border-radius:var(--hv-radius-lg);padding:18px 20px 16px;position:relative;overflow:hidden;animation:fadeUp .5s ease both}
+.chart-title{font-size:15px;font-weight:700;margin-bottom:2px;text-align:center;color:#fff}
+.chart-desc{font-size:11.5px;color:var(--hv-text-secondary);margin-bottom:14px;line-height:1.5;text-align:center}
+.chart-wrap{position:relative;width:100%;height:350px}
+.chart-wrap canvas{width:100% !important;height:100% !important}
+.watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--hv-font-mono);font-size:48px;font-weight:700;color:rgba(255,255,255,0.02);pointer-events:none;white-space:nowrap;letter-spacing:4px;z-index:0}
+
+/* Token & Transfer Tables */
+.data-table{width:100%;border-collapse:collapse;font-size:13px}
+.data-table th{text-align:left;font-family:var(--hv-font-mono);font-size:10px;color:var(--hv-text-muted);text-transform:uppercase;letter-spacing:1px;padding:8px 12px;border-bottom:1px solid var(--hv-border);font-weight:500}
+.data-table td{padding:10px 12px;border-bottom:1px solid var(--hv-border);font-family:var(--hv-font-mono);font-size:12px}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover{background:var(--hv-bg-card-hover)}
+.td-rank{color:var(--hv-text-muted);width:30px}
+.td-token{font-family:var(--hv-font-body);font-weight:500;color:var(--hv-text-primary)}
+.td-amount{color:var(--whale-color)}
+.td-pct{color:var(--hv-text-secondary)}
+.td-inflow{color:var(--accent-red)}
+.td-outflow{color:var(--accent-green)}
+.td-time{color:var(--hv-text-tertiary);font-size:11px}
+.td-addr{color:var(--accent-blue);font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-cell{width:120px}
+.bar-bg{height:6px;background:rgba(255,255,255,0.04);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;background:linear-gradient(90deg,var(--whale-color),var(--whale-light));border-radius:3px;transition:width 0.6s ease}
+
+.share-bar{display:flex;align-items:center;justify-content:center;padding:12px var(--hv-space-lg);border-top:1px solid var(--hv-border);background:var(--hv-bg-surface);border-radius:0 0 var(--hv-radius-lg) var(--hv-radius-lg);margin-top:24px}
+.share-bar-buttons{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.share-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;font-size:.75rem;font-weight:600;font-family:var(--hv-font-body);cursor:pointer;transition:all var(--hv-transition-fast);border:1px solid var(--hv-border-strong);background:var(--hv-bg-card);color:#999;white-space:nowrap}
+.share-btn:hover{transform:translateY(-1px);box-shadow:var(--hv-shadow-sm);color:var(--hv-text-primary)}
+.share-btn svg{flex-shrink:0}
+.share-btn--x:hover{border-color:#fff;color:#fff;background:#111}
+.share-btn--kakao:hover{border-color:#FEE500;color:#191919;background:#FEE500}
+.share-btn--tg:hover{border-color:#26A5E4;color:#fff;background:rgba(38,165,228,.15)}
+.share-btn--copy:hover{border-color:var(--hv-primary);color:var(--hv-primary-light);background:var(--hv-primary-glow)}
+.hv-toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--accent-cyan);color:#000;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:all .3s;z-index:999}
+.hv-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.data-source{text-align:center;font-size:11px;color:var(--hv-text-muted);margin-top:16px;font-family:var(--hv-font-mono)}
+.data-source a{color:var(--accent-cyan);text-decoration:none}
+
+@media(min-width:1600px){.chart-row.duo{grid-template-columns:1fr 1fr}.chart-wrap{height:300px}}
+@media(max-width:768px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .dashboard-header h1{font-size:18px}
+  .kpi-value{font-size:18px}
+  .chart-panel{padding:16px 12px}
+  .dashboard-container{padding:16px 12px}
+  .share-bar-buttons{flex-wrap:wrap;justify-content:center}
+  .share-btn span.label-text{display:none}
+  .share-btn{padding:8px 10px}
+  .bar-cell{display:none}
+  .td-addr{max-width:80px}
+}
+@media(max-width:480px){
+  .kpi-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .kpi-card{padding:14px 10px}
+  .kpi-value{font-size:16px}
+  .kpi-label{font-size:9px}
+}
+</style>
+</head>
+<body>
+
+<div class="dashboard-container">
+
+  <div class="dashboard-header">
+    <h1>스마트머니 & 고래 트래커</h1>
+    <div class="subtitle">
+      $1M+ 대형 전송 · CEX 순유입/유출 · 고래 매집 토큰 추적 &nbsp;|&nbsp;
+      <span id="lastUpdate">업데이트: --</span>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">7일 고래 거래 건수</div>
+      <div class="kpi-value whale" id="kpiWhaleCount">--</div>
+      <div class="kpi-sub" id="kpiWhaleCountSub">$1M+ 전송</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">7일 고래 거래량</div>
+      <div class="kpi-value whale" id="kpiWhaleVolume">--</div>
+      <div class="kpi-sub" id="kpiWhaleVolumeSub">USD 환산</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">7일 CEX 순유입</div>
+      <div class="kpi-value" id="kpiCexNet">--</div>
+      <div class="kpi-sub" id="kpiCexNetSub">양수 = 매도 압력</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">가장 많이 이동된 토큰</div>
+      <div class="kpi-value neutral" id="kpiTopToken">--</div>
+      <div class="kpi-sub" id="kpiTopTokenSub">7일 기준</div>
+    </div>
+  </div>
+
+  <div class="period-bar">
+    <button class="period-btn" data-period="7">7일</button>
+    <button class="period-btn" data-period="14">14일</button>
+    <button class="period-btn active" data-period="30">30일</button>
+    <button class="period-btn" data-period="90">90일</button>
+  </div>
+
+  <!-- Chart 1: Daily Whale Activity -->
+  <div class="chart-row">
+    <div class="chart-panel">
+      <div class="watermark">HERDVIBE</div>
+      <div class="chart-title">일별 고래 활동 ($1M+ 전송)</div>
+      <div class="chart-desc">건수 (바) + 총 거래량 (라인) · 단위: USD</div>
+      <div class="chart-wrap"><canvas id="chartWhaleActivity"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Chart 2: CEX Net Flow -->
+  <div class="chart-row">
+    <div class="chart-panel">
+      <div class="watermark">HERDVIBE</div>
+      <div class="chart-title">CEX 순유입/유출 추이</div>
+      <div class="chart-desc">양수 = 거래소 유입 (매도 압력) · 음수 = 거래소 유출 (매집 신호)</div>
+      <div class="chart-wrap"><canvas id="chartCexFlow"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Tables Row -->
+  <div class="chart-row duo">
+    <!-- Top Whale Tokens -->
+    <div class="chart-panel">
+      <div class="chart-title">고래 매집 TOP 토큰</div>
+      <div class="chart-desc">기간 내 $1M+ 전송 기준 거래량 순위</div>
+      <table class="data-table" id="topTokensTable">
+        <thead><tr><th>#</th><th>토큰</th><th>거래량</th><th>건수</th><th class="bar-cell"></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <!-- Recent Large Transfers -->
+    <div class="chart-panel">
+      <div class="chart-title">최근 대형 전송</div>
+      <div class="chart-desc">$1M 이상 최근 전송 내역</div>
+      <table class="data-table" id="recentTransfersTable">
+        <thead><tr><th>시간</th><th>토큰</th><th>금액</th><th>From</th><th>To</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Chart 3: Token Volume Breakdown -->
+  <div class="chart-row">
+    <div class="chart-panel">
+      <div class="watermark">HERDVIBE</div>
+      <div class="chart-title">토큰별 고래 거래량 비중</div>
+      <div class="chart-desc">$1M+ 전송 기준 토큰 점유율</div>
+      <div class="chart-wrap" style="height:300px"><canvas id="chartTokenShare"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Share Bar -->
+  <div class="share-bar">
+    <div class="share-bar-buttons">
+      <button class="share-btn share-btn--x" onclick="doShare('twitter')"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg><span class="label-text">트위터</span></button>
+      <button class="share-btn share-btn--kakao" onclick="doShare('kakao')"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C6.477 3 2 6.463 2 10.691c0 2.724 1.8 5.112 4.508 6.458l-1.148 4.265a.5.5 0 0 0 .764.533l4.94-3.26c.304.02.612.03.936.03 5.523 0 10-3.462 10-7.735C22 6.463 17.523 3 12 3z"/></svg><span class="label-text">카카오톡</span></button>
+      <button class="share-btn share-btn--tg" onclick="doShare('telegram')"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg><span class="label-text">텔레그램</span></button>
+      <button class="share-btn" onclick="doShare('instagram',this)" style="border-color:var(--hv-border-strong)"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg><span class="label-text">인스타</span></button>
+      <button class="share-btn share-btn--copy" onclick="doShare('link',this)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="label-text">링크 복사</span></button>
+    </div>
+  </div>
+  <div class="hv-toast" id="hvToast"></div>
+  <div class="data-source">Data: <a href="https://dune.com" target="_blank">Dune Analytics</a> · Ethereum On-chain Whale Transfers · Updated Daily via GitHub Actions</div>
+</div>
+
+<script>
+// ═══ SHARE ═══
+var SHARE_URL='https://herdvibe.com/123';
+function ensureKakao(){try{if(typeof Kakao!=='undefined'&&!Kakao.isInitialized())Kakao.init('a43ed7b39fac35458f4f9df925a279b5');return typeof Kakao!=='undefined'&&Kakao.isInitialized();}catch(e){return false;}}
+ensureKakao();
+function kakaoShare(){if(!ensureKakao()){copyToClipboard(SHARE_URL);toast('링크 복사완료!');return;}try{Kakao.Share.sendDefault({objectType:'feed',content:{title:'스마트머니 & 고래 트래커',description:'$1M+ 대형 전송, 고래 매집 토큰, CEX 자금 흐름 추적',imageUrl:'',link:{mobileWebUrl:SHARE_URL,webUrl:SHARE_URL}},buttons:[{title:'대시보드 보기',link:{mobileWebUrl:SHARE_URL,webUrl:SHARE_URL}}]});}catch(e){copyToClipboard(SHARE_URL);toast('링크 복사완료!');}}
+function copyToClipboard(text){try{if(navigator.clipboard)navigator.clipboard.writeText(text);else{var ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);}window.parent.postMessage({type:'clipboard',text:text},'*');}catch(e){}}
+function toast(msg){var el=document.getElementById('hvToast');el.textContent=msg;el.classList.add('show');setTimeout(function(){el.classList.remove('show');},2500);}
+function flashCopied(btn){if(!btn)return;var orig=btn.innerHTML;btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span class="label-text">복사됨</span>';setTimeout(function(){btn.innerHTML=orig;},1500);}
+function doShare(p,btn){var u=SHARE_URL;var t=encodeURIComponent('스마트머니 & 고래 트래커 | herdvibe.com');var eu=encodeURIComponent(u);switch(p){case'twitter':window.open('https://twitter.com/intent/tweet?text='+t+'&url='+eu,'_blank');break;case'telegram':window.open('https://t.me/share/url?url='+eu+'&text='+t,'_blank');break;case'kakao':kakaoShare();break;case'instagram':copyToClipboard(u);flashCopied(btn);toast('링크 복사완료! 인스타그램에 붙여넣기 하세요');break;case'link':copyToClipboard(u);flashCopied(btn);toast('링크가 복사되었습니다 ✓');break;}}
+
+// ═══ SAMPLE DATA ═══
+function generateSampleData(){
+  var data=[];var seed=77;
+  function rand(){seed=(seed*16807+0)%2147483647;return(seed-1)/2147483646;}
+  var start=new Date('2025-01-01');
+  for(var i=0;i<90;i++){
+    var d=new Date(start);d.setDate(d.getDate()+i);
+    var count=Math.floor(80+rand()*120+(rand()>0.9?rand()*200:0));
+    var vol=count*(2+rand()*8)*1e6;
+    var cexIn=vol*(0.2+rand()*0.3);
+    var cexOut=vol*(0.15+rand()*0.35);
+    data.push({
+      date:d.toISOString().split('T')[0],
+      whale_count:count,
+      whale_volume_usd:Math.round(vol),
+      cex_inflow_usd:Math.round(cexIn),
+      cex_outflow_usd:Math.round(cexOut),
+      cex_net_usd:Math.round(cexIn-cexOut)
+    });
+  }
+  return data;
+}
+
+var sampleTopTokens=[
+  {token:'USDT',volume:28400000000,count:892},
+  {token:'USDC',volume:21200000000,count:743},
+  {token:'ETH',volume:15800000000,count:621},
+  {token:'WBTC',volume:8900000000,count:312},
+  {token:'stETH',volume:6200000000,count:198},
+  {token:'DAI',volume:4100000000,count:156},
+  {token:'LINK',volume:2800000000,count:134},
+  {token:'UNI',volume:1900000000,count:98},
+  {token:'AAVE',volume:1400000000,count:72},
+  {token:'MKR',volume:980000000,count:45}
+];
+
+var sampleTransfers=[
+  {time:'2시간 전',token:'USDT',amount:52000000,from:'0x47ac...f8e2',to:'Binance'},
+  {time:'3시간 전',token:'ETH',amount:38000000,from:'0x8b3c...a1d4',to:'0xfe21...9c7b'},
+  {time:'5시간 전',token:'WBTC',amount:24000000,from:'Coinbase',to:'0x2a91...e4f3'},
+  {time:'6시간 전',token:'USDC',amount:18500000,from:'0xd4e7...3b8a',to:'Kraken'},
+  {time:'8시간 전',token:'stETH',amount:15200000,from:'0x71f9...c2d6',to:'0xab34...7e91'},
+  {time:'10시간 전',token:'ETH',amount:12800000,from:'0x93a2...d5f8',to:'OKX'},
+  {time:'12시간 전',token:'LINK',amount:8900000,from:'Binance',to:'0xc8e1...4a2d'},
+  {time:'14시간 전',token:'DAI',amount:7200000,from:'0x5f6d...b3c7',to:'0x19e8...a6f2'},
+  {time:'16시간 전',token:'UNI',amount:5400000,from:'0xea47...1d9c',to:'Coinbase'},
+  {time:'18시간 전',token:'AAVE',amount:3100000,from:'0x3c82...e7a5',to:'0xf912...8b4d'}
+];
+
+// ═══ CHART SETUP ═══
+Chart.defaults.color='#555';
+Chart.defaults.borderColor='rgba(255,255,255,0.06)';
+Chart.defaults.font.family="'JetBrains Mono','Noto Sans KR',monospace";
+Chart.defaults.font.size=11;
+Chart.defaults.plugins.tooltip.backgroundColor='#1a1a1a';
+Chart.defaults.plugins.tooltip.borderColor='rgba(255,255,255,0.12)';
+Chart.defaults.plugins.tooltip.borderWidth=1;
+Chart.defaults.plugins.tooltip.cornerRadius=8;
+Chart.defaults.plugins.tooltip.padding=10;
+
+Chart.register({
+  id:'zeroLine',afterDraw:function(chart){
+    var y=chart.scales.y;if(!y)return;var yy=y.getPixelForValue(0);
+    if(yy<chart.chartArea.top||yy>chart.chartArea.bottom)return;
+    var ctx=chart.ctx;ctx.save();ctx.strokeStyle='rgba(255,255,255,0.1)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(chart.chartArea.left,yy);ctx.lineTo(chart.chartArea.right,yy);ctx.stroke();ctx.restore();
+  }
+});
+
+var allData=generateSampleData();
+var filteredData=[];
+var charts={};
+
+function fmtUsd(v){if(Math.abs(v)>=1e9)return(v/1e9).toFixed(1)+'B';if(Math.abs(v)>=1e6)return(v/1e6).toFixed(1)+'M';if(Math.abs(v)>=1e3)return(v/1e3).toFixed(0)+'K';return v.toFixed(0);}
+
+function filterData(days){
+  filteredData=allData.slice(-days);
+  updateKPIs();
+  rebuildCharts();
+}
+
+function updateKPIs(){
+  var last7=filteredData.slice(-7);
+  var totalCount=last7.reduce(function(s,d){return s+d.whale_count;},0);
+  var totalVol=last7.reduce(function(s,d){return s+d.whale_volume_usd;},0);
+  var totalCexNet=last7.reduce(function(s,d){return s+d.cex_net_usd;},0);
+
+  document.getElementById('kpiWhaleCount').textContent=totalCount.toLocaleString();
+  document.getElementById('kpiWhaleVolume').textContent='$'+fmtUsd(totalVol);
+  var kpiCex=document.getElementById('kpiCexNet');
+  kpiCex.textContent=(totalCexNet>=0?'+':'')+' $'+fmtUsd(Math.abs(totalCexNet));
+  kpiCex.className='kpi-value '+(totalCexNet>=0?'down':'up');
+  document.getElementById('kpiCexNetSub').textContent=totalCexNet>=0?'거래소 유입 (매도 압력)':'거래소 유출 (매집 신호)';
+  document.getElementById('kpiTopToken').textContent=sampleTopTokens[0].token;
+  document.getElementById('kpiTopTokenSub').textContent='$'+fmtUsd(sampleTopTokens[0].volume);
+  document.getElementById('lastUpdate').textContent='업데이트: '+filteredData[filteredData.length-1].date;
+}
+
+function destroyCharts(){Object.keys(charts).forEach(function(k){if(charts[k]){charts[k].destroy();charts[k]=null;}});charts={};}
+
+function rebuildCharts(){
+  destroyCharts();
+  var labels=filteredData.map(function(d){var dt=new Date(d.date);return(dt.getMonth()+1)+'/'+dt.getDate();});
+  var zoomOpts={zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'x'},pan:{enabled:true,mode:'x'}};
+  var gridColor='rgba(255,255,255,0.04)';
+
+  // 1. Whale Activity (bar + line)
+  charts.whaleActivity=new Chart(document.getElementById('chartWhaleActivity'),{
+    type:'bar',
+    data:{labels:labels,datasets:[
+      {label:'건수',data:filteredData.map(function(d){return d.whale_count;}),backgroundColor:'rgba(168,85,247,0.4)',borderColor:'rgba(168,85,247,0.7)',borderWidth:1,borderRadius:2,yAxisID:'y',order:2},
+      {label:'거래량 (USD)',data:filteredData.map(function(d){return d.whale_volume_usd;}),type:'line',borderColor:'#ffd740',backgroundColor:'transparent',tension:0.3,pointRadius:0,pointHitRadius:8,borderWidth:2,yAxisID:'y1',order:1}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:400},interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:true,labels:{usePointStyle:true,pointStyleWidth:8,color:'#888',font:{size:10}}},zoom:zoomOpts},
+      scales:{
+        x:{grid:{display:false},ticks:{maxTicksLimit:10,maxRotation:0,font:{size:10}}},
+        y:{position:'left',grid:{color:gridColor},ticks:{callback:function(v){return v;},font:{size:10}},title:{display:true,text:'건수',color:'#555',font:{size:10}}},
+        y1:{position:'right',grid:{display:false},ticks:{callback:function(v){return '$'+fmtUsd(v);},font:{size:10}},title:{display:true,text:'거래량',color:'#555',font:{size:10}}}
+      }
+    }
+  });
+
+  // 2. CEX Net Flow
+  var cexColors=filteredData.map(function(d){return d.cex_net_usd>=0?'rgba(239,68,68,0.5)':'rgba(34,197,94,0.5)';});
+  var cexBorders=filteredData.map(function(d){return d.cex_net_usd>=0?'rgba(239,68,68,0.8)':'rgba(34,197,94,0.8)';});
+  charts.cexFlow=new Chart(document.getElementById('chartCexFlow'),{
+    type:'bar',
+    data:{labels:labels,datasets:[{
+      label:'CEX 순유입 (USD)',data:filteredData.map(function(d){return d.cex_net_usd;}),
+      backgroundColor:cexColors,borderColor:cexBorders,borderWidth:1,borderRadius:1
+    }]},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:400},interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){var v=ctx.parsed.y;return(v>=0?'유입 +':'유출 ')+'$'+fmtUsd(Math.abs(v));}}},zoom:zoomOpts},
+      scales:{
+        x:{grid:{display:false},ticks:{maxTicksLimit:10,maxRotation:0,font:{size:10}}},
+        y:{grid:{color:gridColor},ticks:{callback:function(v){return(v>=0?'+':'-')+'$'+fmtUsd(Math.abs(v));}}}
+      }
+    }
+  });
+
+  // 3. Token Share Doughnut
+  var topColors=['#a855f7','#c084fc','#00e5cc','#4a9eff','#ffd740','#ff6b35','#22c55e','#ef4444','#f59e0b','#6366f1'];
+  charts.tokenShare=new Chart(document.getElementById('chartTokenShare'),{
+    type:'doughnut',
+    data:{
+      labels:sampleTopTokens.map(function(t){return t.token;}),
+      datasets:[{data:sampleTopTokens.map(function(t){return t.volume;}),backgroundColor:topColors,borderColor:'#111',borderWidth:2}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:600},
+      plugins:{legend:{position:'right',labels:{usePointStyle:true,pointStyleWidth:8,color:'#999',font:{family:"'JetBrains Mono',monospace",size:11},padding:12}},
+        tooltip:{callbacks:{label:function(ctx){return ctx.label+': $'+fmtUsd(ctx.parsed);}}}
+      }
+    }
+  });
+}
+
+function renderTopTokensTable(){
+  var tbody=document.querySelector('#topTokensTable tbody');
+  var max=sampleTopTokens[0].volume;
+  tbody.innerHTML=sampleTopTokens.map(function(t,i){
+    return '<tr><td class="td-rank">'+(i+1)+'</td><td class="td-token">'+t.token+'</td><td class="td-amount">$'+fmtUsd(t.volume)+'</td><td class="td-pct">'+t.count+'</td><td class="bar-cell"><div class="bar-bg"><div class="bar-fill" style="width:'+(t.volume/max*100).toFixed(1)+'%"></div></div></td></tr>';
+  }).join('');
+}
+
+function renderRecentTransfers(){
+  var tbody=document.querySelector('#recentTransfersTable tbody');
+  tbody.innerHTML=sampleTransfers.map(function(t){
+    var isCex=t.to.indexOf('0x')===-1;
+    return '<tr><td class="td-time">'+t.time+'</td><td class="td-token">'+t.token+'</td><td class="td-amount">$'+fmtUsd(t.amount)+'</td><td class="td-addr">'+t.from+'</td><td class="td-addr'+(isCex?' td-inflow':'')+'">'+t.to+'</td></tr>';
+  }).join('');
+}
+
+document.querySelectorAll('.period-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.period-btn').forEach(function(b){b.classList.remove('active');});
+    this.classList.add('active');
+    filterData(parseInt(this.dataset.period));
+  });
+});
+
+renderTopTokensTable();
+renderRecentTransfers();
+filterData(30);
+
+// iframe height (debounced)
+var _lastH=0,_timer=null;
+function sendHeight(){if(_timer)return;_timer=setTimeout(function(){_timer=null;var h=document.documentElement.scrollHeight;if(Math.abs(h-_lastH)>5){_lastH=h;window.parent.postMessage({type:'herdvibe-height',height:h},'*');}},500);}
+window.addEventListener('load',function(){setTimeout(sendHeight,1000);});
+</script>
+</body>
+</html>
