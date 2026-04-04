@@ -1,4 +1,4 @@
-// Auto-generated — 2026-04-03 09:04 UTC
+// Auto-generated — 2026-04-04 08:52 UTC
 const SECTOR_DATA = {
   "AI": [
     {
