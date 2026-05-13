@@ -1,4 +1,4 @@
-// Auto-generated — 2026-05-12 07:07 UTC
+// Auto-generated — 2026-05-13 07:11 UTC
 const ETH_BURN_DATA = [
   {
     "date": "2025-02-01",
