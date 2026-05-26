@@ -1,4 +1,4 @@
-// Auto-generated — 2026-05-25 08:32 UTC
+// Auto-generated — 2026-05-26 08:14 UTC
 const WHALE_DAILY_DATA = [
   {
     "date": "2025-11-28",
