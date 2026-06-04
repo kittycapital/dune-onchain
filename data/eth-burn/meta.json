@@ -1,11 +1,11 @@
 {
-  "last_updated": "2026-06-03T08:01:00.189220+00:00",
+  "last_updated": "2026-06-04T07:46:42.313542+00:00",
   "query_ids": {
     "daily_burn": 6798639,
     "top_burners": 6798644
   },
   "rows": {
-    "daily_burn": 0,
-    "top_burners": 0
+    "daily_burn": 401,
+    "top_burners": 15
   }
 }
