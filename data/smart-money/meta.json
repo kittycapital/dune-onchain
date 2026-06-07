@@ -1,11 +1,11 @@
 {
-  "last_updated": "2026-06-06T07:57:26.145497+00:00",
+  "last_updated": "2026-06-07T08:12:18.122447+00:00",
   "query_ids": {
     "whale_daily": 6798653,
     "whale_top_tokens": 6798657
   },
   "rows": {
-    "whale_daily": 101,
-    "whale_top_tokens": 15
+    "whale_daily": 0,
+    "whale_top_tokens": 0
   }
 }
