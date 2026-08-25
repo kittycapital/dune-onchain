@@ -1,3 +1,3 @@
-// Auto-generated — 2026-08-24 07:55 UTC
+// Auto-generated — 2026-08-25 07:40 UTC
 const WHALE_DAILY_DATA = [];
 const WHALE_TOP_TOKENS = [];
