@@ -1,3 +1,3 @@
-// Auto-generated — 2026-11-07 12:39 UTC
+// Auto-generated — 2026-11-08 12:56 UTC
 const ETH_BURN_DATA = [];
 const ETH_TOP_BURNERS = [];
